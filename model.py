@@ -35,7 +35,7 @@ class SpectraEncoder(nn.Module):
 
         self.pool = nn.AdaptiveAvgPool1d(1)
         self.flatten = nn.Flatten()
-        self.linear = nn.Linear(128, 100)
+        self.linear = nn.Linear(128, latent_dim)
 
     def forward(self, inputs):
         x = self.s1(inputs)

@@ -10,14 +10,12 @@ class PreprocessingPipeline:
             wavenumbers=np.arange(0, 4000, 1), 
             steps=["interpolate", "snv", "baseline", "smoothing"], 
             range_cut=[0, 2000], 
-            normalize=True,
             min_max_itp=False
         ):
         self.wavenumbers = wavenumbers
         self.steps = steps
         self.range_cut = range_cut
         self.min_max_itp = min_max_itp
-        self.normalize = normalize
 
     def process(self, spectrum):
         wv, x = spectrum[:, 0], spectrum[:, 1]
@@ -40,9 +38,6 @@ class PreprocessingPipeline:
                 wv, x = self._cut(wv, x)
             else:
                 raise ValueError(f"Unknown preprocessing step: {step}")
-            
-        if self.normalize:
-            x = self._min_max_normalize(x)
 
         return x
         
