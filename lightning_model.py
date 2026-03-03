@@ -1,12 +1,12 @@
 import torch.nn.functional as F
-import lightning
+import lightning as pl 
 import torch 
 
 from model import SpectraEncoder
 from loss import CLIPLoss
 
 
-class CLIPLightningModel(lightning.LightningModule):
+class CLIPLightningModel(pl.LightningModule):
     def __init__(self, in_channels, latent_dim):
         super().__init__()
         self.model_ftir = SpectraEncoder(in_channels, latent_dim)
