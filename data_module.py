@@ -19,7 +19,7 @@ class MultiModalDataModule(lightning.LightningDataModule):
 
     def setup(self, stage):
         if stage == "fit" or stage is None:
-            self.dtrainval = MultiModalDataset( train=True, transforms=self.transforms, args=self.args)
+            self.dtrainval = MultiModalDataset(train=True, transforms=self.transforms, args=self.args)
             n_val = int(self.val_split * len(self.dtrainval))
             n_train = len(self.dtrainval) - n_val
             self.dtrain, self.dval = random_split(self.dtrainval, [n_train, n_val], generator=torch.Generator().manual_seed(42))
