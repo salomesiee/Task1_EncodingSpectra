@@ -19,20 +19,18 @@ class MultiModalDataModule(lightning.LightningDataModule):
 
     def setup(self, stage):
         if stage == "fit" or stage is None:
-            self.dtrainval = MultiModalDataset( train=True, transforms=self.transforms, args=self.args)
-            n_val = int(self.val_split * len(self.dtrainval))
-            n_train = len(self.dtrainval) - n_val
-            self.dtrain, self.dval = random_split(self.dtrainval, [n_train, n_val], generator=torch.Generator().manual_seed(42))
+            self.dtrain= MultiModalDataset(stage='train', transforms=self.transforms, args=self.args)
+            self.dval = MultiModalDataset(stage='val', transforms=self.transforms, args=self.args)
 
         if stage == "test":
-            self.dtest = MultiModalDataset(train=False, transforms=self.transforms, args=self.args)
+            self.dtest = MultiModalDataset(stage='test', transforms=self.transforms, args=self.args)
 
     def train_dataloader(self):
-        return DataLoader(self.dtrain, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.dtrain, batch_size=self.batch_size, shuffle=True, num_workers=17)
     
     def val_dataloader(self):
-        return DataLoader(self.dval, batch_size=self.batch_size, shuffle=False)
+        return DataLoader(self.dval, batch_size=self.batch_size, shuffle=False, num_workers=17)
     
     def test_dataloader(self):
-        return DataLoader(self.dtest, batch_size=self.batch_size, shuffle=False)
+        return DataLoader(self.dtest, batch_size=self.batch_size, shuffle=False, num_workers=17)
 
