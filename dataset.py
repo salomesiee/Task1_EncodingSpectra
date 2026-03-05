@@ -20,35 +20,20 @@ class SpectralExtraction():
         self.val_size = val_size
 
         df_train, df_val, df_test = self.import_data()
-        df_train, df_val, df_test = self.format_data(df_train, df_val, df_test)
         self.save_data(df_train, df_val, df_test)
 
     def import_data(self):
         ps = PlasticDatabase(load_local_libs=False, data_path=self.datasets_dir)
         df = ps.create_data(self.cache_dir / 'df_all.pkl')
+        df['index'] = df.index
 
-        train_end = int((1 - self.test_size - self.val_size) * len(df)) 
-        val_end   = int((1 - self.test_size) * len(df))
-        train, val, test = np.split(df.sample(frac=1, random_state=42), [train_end, val_end])
-        df_train = pd.DataFrame(train, columns=df.columns)
-        df_test = pd.DataFrame(test, columns=df.columns)
-        df_val = pd.DataFrame(val, columns=df.columns)
+        strat_key = df['plastic'] + '_' + df['spectroscopy']
+
+        df_train, df_temp = train_test_split(df, test_size=self.test_size + self.val_size, stratify=strat_key, random_state=42)
+        strat_key_temp = df_temp['plastic'] + '_' + df_temp['spectroscopy']
+        df_val, df_test = train_test_split(df_temp, test_size=self.test_size / (self.test_size + self.val_size), stratify=strat_key_temp, random_state=42)
 
         return df_train, df_val, df_test
-
-    def format_data(self, *dfs):
-        formatted_dfs = []
-        for df in dfs:
-            non_plastic_mask = (df['plastic'].isin(list(LABELS_MAPPING.values())))
-            dfp = df[non_plastic_mask]
-            # Divide Raman from FTIR
-            df_raman = dfp[dfp['spectroscopy'] == 'raman'][['plastic', 'spectra']]
-            df_ftir = dfp[dfp['spectroscopy'] == 'ftir'][['plastic', 'spectra']]
-
-            # Dataframe of pairs
-            df_pairs = df_raman.merge(df_ftir, on='plastic', suffixes=('_raman', '_ftir'))
-            formatted_dfs.append(df_pairs)
-        return formatted_dfs
 
     def save_data(self, df_train, df_val, df_test):
         # Split sets 
@@ -66,6 +51,7 @@ class SpectralExtraction():
 
 class MultiModalDataset(Dataset):
     def __init__(self, stage, transforms, args):
+        self.stage = stage
         self.mapping = {c: i for i, c in LABELS_MAPPING.items()}  
         self.cache_dir = Path(args.cache_dir)
         self.transforms = transforms
@@ -77,7 +63,19 @@ class MultiModalDataset(Dataset):
             data_path = self.cache_dir / 'df_test.pkl'
         if not os.path.exists(data_path):
             SpectralExtraction(args)
-        self.df = pd.read_pickle(data_path)
+        df_init = pd.read_pickle(data_path)
+        self.df = self.format_data(df_init) 
+
+    def format_data(self, df):
+        non_plastic_mask = (df['plastic'].isin(list(LABELS_MAPPING.values())))
+        dfp = df[non_plastic_mask]
+
+        df_raman = dfp[dfp['spectroscopy'] == 'raman'][['plastic', 'spectra', 'index']]
+        df_ftir = dfp[dfp['spectroscopy'] == 'ftir'][['plastic', 'spectra', 'index']]
+
+        df_pairs = df_raman.merge(df_ftir, on='plastic', suffixes=('_raman', '_ftir'))
+        return df_pairs
+
 
     def __getitem__(self, index):
         ftir = self.df.iloc[index]['spectra_ftir']
@@ -85,11 +83,14 @@ class MultiModalDataset(Dataset):
         
         plastic = self.df.iloc[index]['plastic']
         label = torch.tensor(self.mapping[plastic]) 
+        index_ftir = self.df.iloc[index]['index_ftir']
+        index_raman = self.df.iloc[index]['index_raman']
 
         if self.transforms:
             ftir = self.transforms(ftir)
             raman = self.transforms(raman)
-        return ftir, raman, label
+
+        return ftir, raman, {'label': label, 'index_ftir': index_ftir, 'index_raman': index_raman}
     
     def __len__(self):
         return len(self.df)

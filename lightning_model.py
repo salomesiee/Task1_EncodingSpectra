@@ -7,28 +7,28 @@ from loss import CLIPLoss, ConstrastiveLoss, SimilarityLoss, SymmetricKL
 
 
 class CLIPLightningModel(pl.LightningModule):
-    def __init__(self, in_channels, latent_dim=128):
+    def __init__(self, in_channels=1, latent_dim=128):
         super().__init__()
         self.save_hyperparameters()
-        self.model_ftir = SpectraEncoder(in_channels, latent_dim)
-        self.model_raman = SpectraEncoder(in_channels, latent_dim)
+        self.model_ftir = UNet(in_channels, latent_dim)
+        self.model_raman = UNet(in_channels, latent_dim)
         self.loss_fn = SymmetricKL()
 
     def training_step(self, batch, batch_idx):
-        xf, xr, labels = batch 
+        xf, xr, _ = batch 
         xf_encoding = F.normalize(self.model_ftir(xf), dim=-1)
         xr_encoding = F.normalize(self.model_raman(xr), dim=-1)
 
-        loss = self.loss_fn(xf_encoding, xr_encoding, labels)
+        loss = self.loss_fn(xf_encoding, xr_encoding)
         self.log("train_loss", loss, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
-        xf, xr, labels = batch 
+        xf, xr, _ = batch 
         xf_encoding = F.normalize(self.model_ftir(xf), dim=-1)
         xr_encoding = F.normalize(self.model_raman(xr), dim=-1)
 
-        loss = self.loss_fn(xf_encoding, xr_encoding, labels)
+        loss = self.loss_fn(xf_encoding, xr_encoding)
         self.log("val_loss", loss, sync_dist=True)
         return loss
 
@@ -36,3 +36,20 @@ class CLIPLightningModel(pl.LightningModule):
         optimizer = torch.optim.AdamW(self.parameters(), lr=5e-4, betas=(0.9, 0.98), eps=1e-6, weight_decay=0.2) 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=15, eta_min=1e-6)
         return [optimizer], [scheduler]
+
+    def test_step(self, batch, batch_idx):
+        xf, xr, _ = batch 
+        xf_encoding = F.normalize(self.model_ftir(xf), dim=-1)
+        xr_encoding = F.normalize(self.model_raman(xr), dim=-1)
+
+        loss = self.loss_fn(xf_encoding, xr_encoding)
+        self.log("test_loss", loss, sync_dist=True)
+        return loss 
+
+    def predict_step(self, batch, batch_idx):
+        xf, xr, info = batch 
+        index_ftir, index_raman = info['index_ftir'], info['index_raman']
+        xf_encoding = F.normalize(self.model_ftir(xf), dim=-1)
+        xr_encoding = F.normalize(self.model_raman(xr), dim=-1)
+        return {'ftir_embedding': xf_encoding, 'raman_embedding': xr_encoding, 'index_ftir': index_ftir, 'index_raman': index_raman}
+
