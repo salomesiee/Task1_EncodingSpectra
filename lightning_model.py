@@ -3,15 +3,16 @@ import lightning as pl
 import torch 
 
 from model import SpectraEncoder, UNet
-from loss import CLIPLoss, ConstrastiveLoss
+from loss import CLIPLoss, ConstrastiveLoss, SimilarityLoss, SymmetricKL
 
 
 class CLIPLightningModel(pl.LightningModule):
     def __init__(self, in_channels, latent_dim=128):
         super().__init__()
-        self.model_ftir = UNet(in_channels, latent_dim)
-        self.model_raman = UNet(in_channels, latent_dim)
-        self.loss_fn = ConstrastiveLoss()
+        self.save_hyperparameters()
+        self.model_ftir = SpectraEncoder(in_channels, latent_dim)
+        self.model_raman = SpectraEncoder(in_channels, latent_dim)
+        self.loss_fn = SymmetricKL()
 
     def training_step(self, batch, batch_idx):
         xf, xr, labels = batch 
@@ -32,6 +33,6 @@ class CLIPLightningModel(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=5e-2, betas=(0.9, 0.98), eps=1e-6, weight_decay=0.2) 
+        optimizer = torch.optim.AdamW(self.parameters(), lr=5e-4, betas=(0.9, 0.98), eps=1e-6, weight_decay=0.2) 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=15, eta_min=1e-6)
         return [optimizer], [scheduler]
