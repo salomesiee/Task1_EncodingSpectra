@@ -1,5 +1,5 @@
 datasets/
-lightning_logs/ 
+runs/ 
 .venv/
 __pycache__/
 *.pyc 
